@@ -1,0 +1,106 @@
+import java.util.*;
+
+public class FCFS_from_RR { // Renamed class for clarity
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+
+        int[] pid = new int[n];
+        int[] at = new int[n];
+        int[] bt = new int[n];
+        // rt[] array is no longer needed for scheduling
+        int[] ct = new int[n];
+        int[] tat = new int[n];
+        int[] wt = new int[n];
+        
+        // Time Quantum input is removed
+
+        // Input section
+        for (int i = 0; i < n; i++) {
+            pid[i] = i + 1;
+            System.out.print("Enter Arrival Time and Burst Time for process " + pid[i] + ": ");
+            at[i] = sc.nextInt();
+            bt[i] = sc.nextInt();
+            // rt[i] initialization is removed
+        }
+
+        int time = 0, completed = 0;
+        Queue<Integer> q = new LinkedList<>();
+        boolean[] inQueue = new boolean[n];
+
+        // --- Sorting by arrival time remains crucial for FCFS logic ---
+        // Your existing sorting mechanism is preserved here
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = 0; j < n - i - 1; j++) {
+                if (at[j] > at[j + 1]) {
+                    int temp;
+                    temp = at[j]; at[j] = at[j + 1]; at[j + 1] = temp;
+                    temp = bt[j]; bt[j] = bt[j + 1]; bt[j + 1] = temp;
+                    // rt[] swap removed
+                    temp = pid[j]; pid[j] = pid[j + 1]; pid[j + 1] = temp;
+                }
+            }
+        }
+
+        // Start with the first arrived process
+        q.add(0);
+        inQueue[0] = true;
+
+        while (completed < n) {
+            if (q.isEmpty()) {
+                // CPU idle — jump time to the arrival of the next uncompleted process
+                int nextArrival = Integer.MAX_VALUE;
+                int nextProcess = -1;
+                for (int i = 0; i < n; i++) {
+                    if (ct[i] == 0 && at[i] < nextArrival) { // ct[i] == 0 means not completed
+                        nextArrival = at[i];
+                        nextProcess = i;
+                    }
+                }
+                
+                if (nextProcess != -1) {
+                    time = nextArrival;
+                    q.add(nextProcess);
+                    inQueue[nextProcess] = true;
+                } else {
+                    break; // Should not happen if completed < n
+                }
+            }
+
+            int idx = q.poll();
+            inQueue[idx] = false;
+
+            // --- KEY NON-PREEMPTIVE EXECUTION ---
+            time += bt[idx]; // Run to completion
+            
+            ct[idx] = time;
+            completed++;
+
+            // Add new processes that have arrived during execution
+            // We iterate through ALL processes to check for newly arrived ones
+            for (int i = 0; i < n; i++) {
+                // If process is not current, not in queue, not completed, AND has arrived
+                if (ct[i] == 0 && !inQueue[i] && at[i] <= time) {
+                    q.add(i);
+                    inQueue[i] = true;
+                }
+            }
+        }
+
+        // Calculate TAT and WT
+        for (int i = 0; i < n; i++) {
+            tat[i] = ct[i] - at[i];
+            wt[i] = tat[i] - bt[i];
+        }
+
+        // Display results
+        System.out.println("\nPID\tAT\tBT\tCT\tTAT\tWT");
+        for (int i = 0; i < n; i++) {
+            System.out.println(pid[i] + "\t" + at[i] + "\t" + bt[i] + "\t" +
+                               ct[i] + "\t" + tat[i] + "\t" + wt[i]);
+        }
+
+        sc.close();
+    }
+}

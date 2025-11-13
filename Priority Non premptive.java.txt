@@ -1,0 +1,69 @@
+Priority.java
+
+import java.util.*;
+
+public class priority {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+
+        int[] pid = new int[n];
+        int[] at = new int[n];
+        int[] bt = new int[n];
+        int[] pr = new int[n];  // Priority (lower value = higher priority)
+        int[] ct = new int[n];
+        int[] tat = new int[n];
+        int[] wt = new int[n];
+        boolean[] done = new boolean[n];
+
+        // Input section
+        for (int i = 0; i < n; i++) {
+            pid[i] = i + 1;
+            System.out.print("Enter Arrival Time, Burst Time, and Priority for process " + pid[i] + ": ");
+            at[i] = sc.nextInt();
+            bt[i] = sc.nextInt();
+            pr[i] = sc.nextInt();
+        }
+
+        int time = 0, completed = 0;
+
+        // Scheduling logic
+        while (completed < n) {
+            int idx = -1;
+            int highestPriority = Integer.MAX_VALUE;
+
+            // Find the process with highest priority (lowest number) that has arrived
+            for (int i = 0; i < n; i++) {
+                if (!done[i] && at[i] <= time && pr[i] < highestPriority) {
+                    highestPriority = pr[i];
+                    idx = i;
+                }
+            }
+
+            // If no process has arrived yet, move time forward
+            if (idx == -1) {
+                time++;
+                continue;
+            }
+
+            // Execute the selected process
+            time += bt[idx];
+            ct[idx] = time;
+            tat[idx] = ct[idx] - at[idx];
+            wt[idx] = tat[idx] - bt[idx];
+            done[idx] = true;
+            completed++;
+        }
+
+        // Display output
+        System.out.println("\nPID\tAT\tBT\tPR\tCT\tTAT\tWT");
+        for (int i = 0; i < n; i++) {
+            System.out.println(pid[i] + "\t" + at[i] + "\t" + bt[i] + "\t" + pr[i] + "\t" +
+                               ct[i] + "\t" + tat[i] + "\t" + wt[i]);
+        }
+
+        sc.close();
+    }
+}

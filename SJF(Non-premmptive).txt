@@ -1,0 +1,97 @@
+import java.util.*;
+
+class Process {
+    int pid;
+    int arrivalTime;
+    int burstTime;
+    // We only need completionTime to track if a process has finished
+    int completionTime; 
+    int waitingTime;
+    int turnaroundTime;
+    
+    // Constructor
+    public Process(int pid, int arrivalTime, int burstTime) {
+        this.pid = pid;
+        this.arrivalTime = arrivalTime;
+        this.burstTime = burstTime;
+        this.completionTime = 0; // Initialize to 0 (uncompleted)
+    }
+}
+
+public class SJFNonPreemptive {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+        Process[] processes = new Process[n];
+
+        for (int i = 0; i < n; i++) {
+            System.out.print("Enter arrival time for process " + (i + 1) + ": ");
+            int arrivalTime = sc.nextInt();
+            System.out.print("Enter burst time for process " + (i + 1) + ": ");
+            int burstTime = sc.nextInt();
+            processes[i] = new Process(i + 1, arrivalTime, burstTime);
+        }
+
+        // Sorting by arrival time is helpful for the initial scheduling sequence
+        Arrays.sort(processes, Comparator.comparingInt(p -> p.arrivalTime));
+
+        int currentTime = 0;
+        int completed = 0;
+        double totalWaitingTime = 0;
+        double totalTurnaroundTime = 0;
+
+        System.out.println("\nPID\tArrival\tBurst\tCompletion\tWaiting\tTurnaround");
+
+        while (completed < n) {
+            Process shortestJob = null; 
+
+            // --- SELECTION: Find the shortest job based on FULL Burst Time (BT) ---
+            for (Process p : processes) {
+                // Check if process has arrived (p.arrivalTime <= currentTime) 
+                // AND has NOT been completed yet (p.completionTime == 0)
+                if (p.completionTime == 0 && p.arrivalTime <= currentTime) {
+                    
+                    // Select the first arrived job or a shorter job
+                    if (shortestJob == null || p.burstTime < shortestJob.burstTime) {
+                        shortestJob = p;
+                    } 
+                    // Tie-breaker: If burst times are equal, favor the one that arrived earlier
+                    else if (p.burstTime == shortestJob.burstTime && p.arrivalTime < shortestJob.arrivalTime) {
+                        shortestJob = p;
+                    }
+                }
+            }
+
+            if (shortestJob != null) {
+                
+                // --- EXECUTION: Non-Preemptive Run to Completion ---
+                // Advance currentTime by the full burst time
+                currentTime += shortestJob.burstTime;
+                
+                // Calculate times upon completion
+                shortestJob.completionTime = currentTime;
+                shortestJob.turnaroundTime = shortestJob.completionTime - shortestJob.arrivalTime;
+                shortestJob.waitingTime = shortestJob.turnaroundTime - shortestJob.burstTime;
+                
+                // Mark as completed and update averages
+                completed++;
+                totalWaitingTime += shortestJob.waitingTime;
+                totalTurnaroundTime += shortestJob.turnaroundTime;
+
+                // Print the result
+                System.out.printf("%d\t%d\t%d\t%d\t\t%d\t%d\n", shortestJob.pid,
+                            shortestJob.arrivalTime, shortestJob.burstTime, shortestJob.completionTime,
+                            shortestJob.waitingTime, shortestJob.turnaroundTime);
+            } else {
+                // If no process has arrived yet, advance time by 1 to wait
+                currentTime++; 
+            }
+        }
+
+        System.out.printf("\nAverage Waiting Time: %.2f", totalWaitingTime / n);
+        System.out.printf("\nAverage Turnaround Time: %.2f\n", totalTurnaroundTime / n);
+
+        sc.close();
+    }
+}

@@ -1,0 +1,108 @@
+RRobin.java
+
+import java.util.*;
+
+public class round_robin {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+
+        int[] pid = new int[n];
+        int[] at = new int[n];
+        int[] bt = new int[n];
+        int[] rt = new int[n]; // Remaining Time
+        int[] ct = new int[n];
+        int[] tat = new int[n];
+        int[] wt = new int[n];
+
+        System.out.print("Enter Time Quantum: ");
+        int tq = sc.nextInt();
+
+        // Input section
+        for (int i = 0; i < n; i++) {
+            pid[i] = i + 1;
+            System.out.print("Enter Arrival Time and Burst Time for process " + pid[i] + ": ");
+            at[i] = sc.nextInt();
+            bt[i] = sc.nextInt();
+            rt[i] = bt[i];
+        }
+
+        int time = 0, completed = 0;
+        Queue<Integer> q = new LinkedList<>();
+        boolean[] inQueue = new boolean[n];
+
+        // Sort by arrival time for fairness
+        for (int i = 0; i < n - 1; i++) {
+            for (int j = 0; j < n - i - 1; j++) {
+                if (at[j] > at[j + 1]) {
+                    int temp;
+
+                    temp = at[j]; at[j] = at[j + 1]; at[j + 1] = temp;
+                    temp = bt[j]; bt[j] = bt[j + 1]; bt[j + 1] = temp;
+                    temp = rt[j]; rt[j] = rt[j + 1]; rt[j + 1] = temp;
+                    temp = pid[j]; pid[j] = pid[j + 1]; pid[j + 1] = temp;
+                }
+            }
+        }
+
+        q.add(0);
+        inQueue[0] = true;
+
+        while (completed < n) {
+            if (q.isEmpty()) {
+                // CPU idle — jump to next arrival
+                for (int i = 0; i < n; i++) {
+                    if (rt[i] > 0) {
+                        time = at[i];
+                        q.add(i);
+                        inQueue[i] = true;
+                        break;
+                    }
+                }
+            }
+
+            int idx = q.poll();
+            inQueue[idx] = false;
+
+            // Execute current process for min(time quantum, remaining time)
+            int execTime = Math.min(tq, rt[idx]);
+            rt[idx] -= execTime;
+            time += execTime;
+
+            // Add new processes that have arrived during execution
+            for (int i = 0; i < n; i++) {
+                if (i != idx && !inQueue[i] && rt[i] > 0 && at[i] <= time) {
+                    q.add(i);
+                    inQueue[i] = true;
+                }
+            }
+
+            // If current process still not finished, re-add it
+            if (rt[idx] > 0) {
+                q.add(idx);
+                inQueue[idx] = true;
+            } else {
+                // Process completed
+                ct[idx] = time;
+                completed++;
+            }
+        }
+
+        // Calculate TAT and WT
+        for (int i = 0; i < n; i++) {
+            tat[i] = ct[i] - at[i];
+            wt[i] = tat[i] - bt[i];
+        }
+
+        // Display results
+        System.out.println("\nPID\tAT\tBT\tCT\tTAT\tWT");
+        for (int i = 0; i < n; i++) {
+            System.out.println(pid[i] + "\t" + at[i] + "\t" + bt[i] + "\t" +
+                               ct[i] + "\t" + tat[i] + "\t" + wt[i]);
+        }
+
+        sc.close();
+    }
+}

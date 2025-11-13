@@ -1,0 +1,85 @@
+import java.util.*;
+
+public class priority {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+
+        int[] pid = new int[n];
+        int[] at = new int[n];
+        int[] bt = new int[n];
+        int[] pr = new int[n];
+        
+        // --- ADDED ---
+        int[] rt = new int[n]; // Remaining Time for Preemption
+        
+        // Priority (lower value = higher priority)
+        int[] ct = new int[n];
+        int[] tat = new int[n];
+        int[] wt = new int[n];
+        
+        // --- CHANGED ---
+        // Using 'completed' array now tracks if the process is finished (rt[i] == 0)
+        boolean[] completed = new boolean[n]; 
+
+        // Input section
+        for (int i = 0; i < n; i++) {
+            pid[i] = i + 1;
+            System.out.print("Enter Arrival Time, Burst Time, and Priority for process " + pid[i] + ": ");
+            at[i] = sc.nextInt();
+            bt[i] = sc.nextInt();
+            pr[i] = sc.nextInt();
+            rt[i] = bt[i]; // Initialize remaining time
+        }
+
+        int time = 0, completedCount = 0;
+
+        // Scheduling logic - Preemptive Priority (PP)
+        while (completedCount < n) {
+            int idx = -1;
+            int highestPriority = Integer.MAX_VALUE;
+
+            // Find the process with highest priority (lowest number) that has arrived and is not completed
+            for (int i = 0; i < n; i++) {
+                // Check if process has arrived (at[i] <= time), has remaining time (rt[i] > 0), 
+                // and has a higher priority than current highest
+                if (rt[i] > 0 && at[i] <= time && pr[i] < highestPriority) {
+                    highestPriority = pr[i];
+                    idx = i;
+                }
+            }
+
+            // If no process is ready (gap in timeline), advance time
+            if (idx == -1) {
+                time++;
+                continue;
+            }
+
+            // --- KEY PREEMPTIVE CHANGES ---
+            // 1. Run the selected process for only 1 time unit
+            rt[idx]--;
+            time++;
+
+            // 2. Check if the process has completed its execution
+            if (rt[idx] == 0) {
+                completed[idx] = true;
+                completedCount++;
+
+                // 3. Calculate times upon completion
+                ct[idx] = time;
+                tat[idx] = ct[idx] - at[idx];
+                wt[idx] = tat[idx] - bt[idx];
+            }
+        }
+
+        // Display output
+        System.out.println("\nPID\tAT\tBT\tPR\tCT\tTAT\tWT");
+        for (int i = 0; i < n; i++) {
+            System.out.println(pid[i] + "\t" + at[i] + "\t" + bt[i] + "\t" + pr[i] + "\t" +
+                               ct[i] + "\t" + tat[i] + "\t" + wt[i]);
+        }
+
+        sc.close();
+    }
+}
