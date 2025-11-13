@@ -1,0 +1,216 @@
+**********************First file -  TwoPassAssembler.java ************************
+import java.io.*;
+import java.util.*;
+
+public class TwoPassAssembler {
+    static class Opcode {
+        String mnemonic;
+        int code;
+        String type; // IS, DL, AD
+
+        Opcode(String m, int c, String t) {
+            mnemonic = m;
+            code = c;
+            type = t;
+        }
+    }
+
+    static Map<String, Opcode> OPTAB = new HashMap<>();
+    static Map<String, Integer> SYMTAB = new LinkedHashMap<>();
+    static int LC = 0;
+    static List<String> intermediateCode = new ArrayList<>();
+
+    public static void initOptab() {
+        // Assembler directives
+        OPTAB.put("START", new Opcode("START", -1, "AD"));
+        OPTAB.put("END", new Opcode("END", -1, "AD"));
+        // Imperative statements
+        OPTAB.put("MOV", new Opcode("MOV", 1, "IS"));
+        OPTAB.put("ADD", new Opcode("ADD", 2, "IS"));
+        OPTAB.put("SUB", new Opcode("SUB", 3, "IS"));
+        // Declarative statements
+        OPTAB.put("DS", new Opcode("DS", -1, "DL"));
+        OPTAB.put("DC", new Opcode("DC", -1, "DL"));
+    }
+
+    public static void pass1(String inputFile) throws IOException {
+        try (BufferedReader br = new BufferedReader(new FileReader(inputFile))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                int index = 0;
+                String label = null, mnemonic = null;
+                String operand1 = null, operand2 = null;
+
+                if (OPTAB.containsKey(parts[0])) {
+                    mnemonic = parts[0];
+                    index = 1;
+                } else {
+                    label = parts[0];
+                    if (parts.length > 1) {
+                        mnemonic = parts[1];
+                        index = 2;
+                    } else {
+                        System.err.println("Warning: label without instruction: " + line);
+                        continue;
+                    }
+                }
+
+                if (index < parts.length) operand1 = parts[index++].replace(",", "");
+                if (index < parts.length) operand2 = parts[index].replace(",", "");
+
+                Opcode op = OPTAB.get(mnemonic);
+
+                if ("START".equals(mnemonic)) {
+                    LC = Integer.parseInt(operand1);
+                    intermediateCode.add(String.format("%d (AD,01) (C,%d)", LC, LC));
+                    continue;
+                }
+
+                if (label != null) {
+                    SYMTAB.put(label, LC);
+                }
+
+                if (op == null) continue;
+
+                switch (op.type) {
+                    case "IS":
+                        intermediateCode.add(String.format("%d (IS,%02d) %s %s",
+                                LC, op.code,
+                                operand1 != null ? operand1 : "0",
+                                operand2 != null ? operand2 : "0"));
+                        LC++;
+                        break;
+                    case "DL":
+                        if (mnemonic.equals("DS")) {
+                            intermediateCode.add(String.format("%d (DL,01) (C,%s)", LC, operand1));
+                            SYMTAB.put(label, LC);
+                            LC += Integer.parseInt(operand1);
+                        } else if (mnemonic.equals("DC")) {
+                            intermediateCode.add(String.format("%d (DL,02) (C,%s)", LC, operand1));
+                            SYMTAB.put(label, LC);
+                            LC++;
+                        }
+                        break;
+                    case "AD":
+                        if (mnemonic.equals("END")) {
+                            intermediateCode.add(String.format("%d (AD,02)", LC));
+                        }
+                        break;
+                }
+            }
+        }
+
+        try (BufferedWriter icWriter = new BufferedWriter(new FileWriter("intermediate.txt"))) {
+            for (String s : intermediateCode) {
+                icWriter.write(s);
+                icWriter.newLine();
+            }
+        }
+
+        try (BufferedWriter symWriter = new BufferedWriter(new FileWriter("symbol_table.txt"))) {
+            for (Map.Entry<String, Integer> entry : SYMTAB.entrySet()) {
+                symWriter.write(entry.getKey() + "\t" + entry.getValue());
+                symWriter.newLine();
+            }
+        }
+    }
+
+    public static void pass2() {
+        try {
+            Map<String, Integer> symtab = new HashMap<>();
+            try (BufferedReader symReader = new BufferedReader(new FileReader("symbol_table.txt"))) {
+                String line;
+                while ((line = symReader.readLine()) != null) {
+                    String[] parts = line.split("\\s+");
+                    if (parts.length >= 2) symtab.put(parts[0], Integer.parseInt(parts[1]));
+                }
+            }
+
+            List<String> finalCode = new ArrayList<>();
+            try (BufferedReader icReader = new BufferedReader(new FileReader("intermediate.txt"))) {
+                String line;
+                while ((line = icReader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty()) continue;
+                    String[] parts = line.split("\\s+");
+                    String lc = parts[0];
+                    if (parts.length < 2) continue;
+                    String codeToken = parts[1];
+
+                    if (codeToken.startsWith("(AD")) continue;
+                    if (codeToken.startsWith("(IS")) {
+                        String opcode = codeToken.substring(4, codeToken.length() - 1);
+                        String op1 = parts.length >= 3 ? parts[2] : "0";
+                        String op2 = parts.length >= 4 ? parts[3] : "0";
+                        op1 = symtab.getOrDefault(op1, 0) + "";
+                        op2 = symtab.getOrDefault(op2, 0) + "";
+                        finalCode.add(String.format("%s %s %s %s", lc, opcode, op1, op2));
+                    } else if (codeToken.startsWith("(DL,01)")) {
+                        String size = parts[2].replaceAll("[^0-9]", "");
+                        int sz = Integer.parseInt(size);
+                        for (int i = 0; i < sz; i++) {
+                            finalCode.add(String.format("%d 00 0 0", Integer.parseInt(lc) + i));
+                        }
+                    } else if (codeToken.startsWith("(DL,02)")) {
+                        String constant = parts[2].replaceAll("[^0-9]", "");
+                        finalCode.add(String.format("%s 00 %s 0", lc, constant));
+                    }
+                }
+            }
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter("final_code.txt"))) {
+                for (String s : finalCode) {
+                    writer.write(s);
+                    writer.newLine();
+                }
+            }
+
+            System.out.println("Pass-II complete: final_code.txt generated.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            System.out.println("Working Directory: " + System.getProperty("user.dir"));
+            initOptab();
+            System.out.println("Running Pass-I...");
+            pass1("input.txt");
+            System.out.println("Pass-I complete: intermediate.txt, symbol_table.txt generated.");
+            System.out.println("Running Pass-II...");
+            pass2();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+*********************second file- input.txt******************************
+
+START 100
+MOV A, B
+ADD A, C
+SUB B, 1
+TWO DS 2
+ONE DC 1
+END
+
+
+Out this in terminal and run to run the code *****************************
+
+javac TwoPassAssembler.java
+java TwoPassAssembler
+
+
+we get 4 files as output
+
+i.e is
+TwoPassAssembler.class
+intermediate.txt
+symbol_table.txt
+final_code.txt
